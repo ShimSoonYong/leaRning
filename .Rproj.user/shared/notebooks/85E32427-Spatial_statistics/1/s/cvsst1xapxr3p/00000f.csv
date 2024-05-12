@@ -1,0 +1,2 @@
+"0","library(scales)"
+"0","plot(ran_pts,cols=hue_pal()(3)[1],main="""",pch= 20)"

@@ -1,0 +1,97 @@
+```         
+title: "The R Book: Spatial Statistics"
+output: pdf_document                   
+```
+
+# Spatial Point processes
+
+If our data from a spatial point pattern, then we model them using **spatial point processes**.
+
+For most of this section, we will use the [spatstat]{style="color: skyblue"} package(Baddeley et al., 2015a)
+
+[library(spatstat)]{style="color: brown"}
+
+Before we can analysis our data, we need to represent them in a point pattern in a format that [spatstat]{style="color:skyblue"} can recognise. If we are working in two dimensions, then we need two specify *x* and *y* coordinates of each point together with the **window** within which those points lie.
+
+```{r}
+library(spatstat) 
+runif(100) -> xcoord 
+runif(100) -> ycoord 
+ppp(x = xcoord, y = ycoord, window = square(r=1)) -> ran_pts
+summary(ran_pts)
+```
+
+**Figure 21.1** 100 randomly generated points.
+
+```{r}
+library(scales)
+plot(ran_pts,cols=hue_pal()(3)[1],main="",pch= 20)
+```
+
+We have changed the representation of a point using the argument [pch = 20]{style="color:brown"}. There are many ways to describe a window, but here we have specified a square with sides of length one, and so out randomly drawn *x* and *y* coordinates fit within that.
+
+Data can also be imported from spreadsheets or standard formats used by Geographic Information Systems(GIS). This job may require the use of other *R* packages such as [maptools]{style="color:skyblue"} or [shapefiles]{style="color:skyblue"}.
+
+The first question: Is there is any evidence to allow rejection of null hypothesis of **complete spatial randomness(CSR)**, sometimes described as a **Poisson Process**.
+
+In a **random** pattern, the distribution of each point is completely independent of the distribution of every other.
+
+In a **regular** pattern, individual points are more spaced out than in a random one, by some mechanism that eliminates individuals that are too close together.
+
+In a **clustered** pattern, individuals are more clumped than in a random one, because of some process such as reproduction with limited dispersal, or because of underlying spatial heterogeneity.
+
+------------------------------------------------------------------------
+
+## How can we check for randomness?
+
+It may be quite difficult to discriminate between randomness and other patters in part or all of a window just by inspection. A number of more formal approaches have thus been developed to check for randomness and also to understand where regularity or clustering may occur.
+
+None of them is perfect so it is a good idea to use more than one of them on any data. Let's delve them by **ponderosa** dataset from [spatstat]{style="color:skyblue"} which describes tree locations.
+
+```{r}
+summary(ponderosa)
+```
+
+The first approach uses a **quadrat test** wherein the window is divided into quadrats. The number of points in each quadrat is compared to the number we would expect from randomness using a $\chi^{2}$ goodness of fit test.
+
+```{r}
+quadrat.test(ponderosa, nx = 3,
+             ny =3)->pond_quad
+plot(ponderosa, main = "", cols = hue_pal()(1), pch = 20)
+plot(pond_quad, add = TRUE)
+```
+
+In each quadrat, the first number is the count of points, the second is the expected number given randomness and the third is the Pearson residuals.
+
+```{r}
+pond_quad
+```
+
+So far, there appears to be some evidence against randomness, but it is not overwhelming. The number of quadrats to use will be determined by how many data points we have. So we need a reasonable number in each quadrat for the test to work, but want to be able to have as many as quadrats as possible to detect where any non-randomness occurs.
+
+*R*'s default is $5 \times 5$ but the area under study may not be square. In this example, we have chosen $3 \times 3$ as there is not a huge amount of data. If we had chosen $5 \times 5$, then the expected number of points in each quadrat would have been fewer than five and the $\chi^2$ test would have not been valid.
+
+The second approach to exploring randomness is to select a mathematical function that takes values at every point in the window (perhaps a covariate such as direction or slope) and then compare its empirical cumulative distribution function, CDF acting on the data with the CDF that would have arisen from CSR, using Kolmogorov-Smirnov test.
+
+```{r}
+cdf.test(ponderosa, covariate="x", test = "ks")
+```
+
+There appears to be good evidence against no trend in that direction. Incidentally, there is no strong evidence of a trend along the *y*-axis.
+
+```{r}
+cdf.test(ponderosa, covariate = "y", test = "ks")
+```
+
+Although we have use the KS test, other tests are available, so we may choose our favorite.
+
+
+
+
+
+
+
+
+
+
+

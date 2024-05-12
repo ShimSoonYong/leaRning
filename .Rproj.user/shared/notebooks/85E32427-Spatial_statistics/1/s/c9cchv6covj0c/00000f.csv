@@ -1,0 +1,3 @@
+"0","quadrat.test(ponderosa, nx = 3,"
+"0","             ny =3)->pond_quad"
+"0","plot(ponderosa, main = """", cols = hue_pal()(1), pch = 20)"
