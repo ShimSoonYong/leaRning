@@ -1,0 +1,89 @@
+finance <- read.csv("Datasets(csv files)/finance.csv", header =TRUE)
+head(finance)
+
+## Linear Discriminant Analysis (LDA)
+library(MASS)
+finance.lda <- lda(y ~ x1 + x2 + x3 + x4, data = finance)
+print(finance.lda) # with centered data
+
+# Prior probabilities of groups:
+#   1         2 
+# 0.4565217 0.5434783 
+table(finance$y)
+prop.table(table(finance$y))
+
+# Group means:
+#   x1          x2       x3        x4
+# 1 -0.07319048 -0.08180952 1.367048 0.4378571
+# 2  0.23492000  0.05472000 2.580400 0.4281200
+colMeans(finance[finance$y == 1, c("x1", "x2", "x3", "x4")])
+colMeans(finance[finance$y == 2, c("x1", "x2", "x3", "x4")])
+
+# Coefficients of linear discriminants:
+#   LD1
+# x1  1.0023665
+# x2  3.9998578
+# x3  0.8450508
+# x4 -1.0153181
+y <- finance$y
+X <- scale(finance[, c("x1", "x2", "x3", "x4")], center = TRUE, scale = FALSE)
+x1 <- X[y == 1, ]
+x2 <- X[y == 2, ]
+
+n1 <- nrow(x1)
+n2 <- nrow(x2)
+xbar1 <- colMeans(x1)
+xbar2 <- colMeans(x2)
+
+Sp <- ((n1 - 1) * cov(x1) + (n2 - 1) * cov(x2))/(n1 + n2 - 2)
+# install.packages("Morpho")
+library(Morpho)
+covW(X, groups = as.factor(y))
+
+(b <- solve(Sp) %*% xbar1 - solve(Sp) %*% xbar2)
+b/sqrt(as.numeric(t(b) %*% Sp %*% b))
+
+# L*(x) = 1.002(x1 - m1) + 3.999(x2 - m2) + 0.845(x3 - m3) - 1.015(x - m4) 
+# L*(x) < 0 when P1(x) > P2(x)
+# L*(x) > 0 when P1(x) < P2(x)
+plot(finance.lda, type = "both")
+
+pred1 <- predict(finance.lda, finance)
+finance.pred1 <- cbind(finance, round(pred1$x, 2), round(pred1$posterior,2), pred1$class)
+finance.pred1
+
+predict(finance.lda, data.frame(x1 = -0.5, x2 = -0.4, x3 = 1.02, x4 = 0.45))
+
+
+finance.mss1 <- table(finance$y, pred1$class)
+install.packages("DescTools")
+library(DescTools)
+Desc(finance.mss1, digits = 2)
+
+
+# testing homogeneity
+library(biotools)
+finance.X <- finance[, 2:5]
+finance.boxM <- boxM(finance.X, finance$y)
+finance.boxM
+
+## Quadratic discriminant analysis
+finance.qda <- qda(y ~ x1 + x2 + x3 + x4, data = finance)
+pred2 <- predict(finance.qda, finance)
+finance.mss2 <- table(finance$y, pred2$class)
+Desc(finance.mss2, digits = 2)
+
+
+install.packages("klaR")
+library(klaR)
+finance$y <- as.factor(finance$y)
+partimat(y ~ x1 + x2 + x3 + x4, data = finance, method = "lda")
+partimat(y ~ x1 + x2 + x3 + x4, data = finance, method = "qda")
+
+### Logistic discriminant analysis
+fit.logit <- glm(as.factor(y) ~ X, family = "binomial")
+summary(fit.logit)
+p <- predict(fit.logit, type = "response")
+pred_logit <- ifelse(p < 0.5, 1, 2)
+
+cbind(finance, pred_lda = pred1$class,  pred_qda = pred2$class, pred_logit = pred_logit)

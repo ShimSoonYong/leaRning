@@ -1,0 +1,353 @@
+---
+title: "AIDS_Classification"
+author: "Shim Soon Yong"
+date: "2024-05-20"
+output:
+  word_document: default
+  latex_engine: xelatex
+  pdf_document: null
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 다변량 분석에 필수적인 패키지 탑재하기
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(GGally)
+library(psych)
+library(MASS)
+library(factoextra)
+tidymodels_prefer()
+read_csv("C:/Users/user/OneDrive/바탕 화면/leaRning/Kaggle/data/AIDS_Classification.csv") -> AIDS
+```
+
+# 간단하게 훑기(skim)
+
+```{r}
+AIDS |> skim()
+```
+
+각 변수별 분포의 형태가 복잡하다. 복잡하다는 것은 곧 미지의 복잡한 패턴을 따를 수도 있다는 것이다. 패턴 파악을 위해 기본적인 다변량 가설검정들을 실시하겠다.
+
+# 다변량 분석: 가설검정
+
+## 에이즈 감염자 그룹 간 평균 차이 검정하기
+
+```{r}
+# 필요 패키지
+library(Hotelling)
+library(biotools)
+
+# 가설검정 모델에 적합한 전처리
+AIDS |> mutate_at(vars(symptom, 
+                        infected, 
+                        homo, 
+                        hemo, 
+                        gender, 
+                        offtrt, 
+                        oprior, 
+                        race, 
+                        str2, 
+                        strat, 
+                        z30, 
+                        drugs, 
+                        karnof), as.factor) -> AIDS
+
+AIDS |> select(-c(symptom, 
+                        infected, 
+                        homo, 
+                        hemo, 
+                        gender, 
+                        offtrt, 
+                        oprior, 
+                        race, 
+                        str2, 
+                        strat, 
+                        z30, 
+                        drugs, 
+                        karnof)) -> num.vars
+
+AIDS |> filter(infected == 0) |> select(-c(symptom, 
+                        infected, 
+                        homo, 
+                        hemo, 
+                        gender, 
+                        offtrt, 
+                        oprior, 
+                        race, 
+                        str2, 
+                        strat, 
+                        z30, 
+                        drugs, 
+                        karnof)) -> Not.infect
+AIDS |> filter(infected == 1) |> select(-c(symptom, 
+                        infected, 
+                        homo, 
+                        hemo, 
+                        gender, 
+                        offtrt, 
+                        oprior, 
+                        race, 
+                        str2, 
+                        strat, 
+                        z30, 
+                        drugs, 
+                        karnof)) -> infect
+boxM(num.vars, group = AIDS$infected)
+
+# 가설검정
+cat("Hotelling's T squared test for diffrence between Mean Vectors\n")
+
+  hotelling.test(x = Not.infect, y = infect,  var.equal = FALSE) -> T.square
+T.square
+```
+
+Box의 M 검정은 공분산 행렬 간의 동질성(Homogeneity)을 검정한다. 귀무가설은 F검정과 동일하게 두 그룹 간에 분산의 차이가 없다는 것인데, 분산이 그냥 분산이 아니라 여러 개의 변수들에 대한 분산과 공분산을 담은 공분산 행렬을 비교한다. 여기서는 유의확률이 0에 가까워 공분산 행렬이 같다고 할 수 없고, 따라서 호텔링의 $T^{2}$ 검정을 하는 함수의 *var.equal* 옵션에 FALSE를 입력하였다. 호텔링의 $T^{2}$ 검정 결과는 예상대로 유의확률 0으로 에이즈 감염자와 비감염자 간 유의미한 평균 벡터의 차이가 있었다.
+
+## 다변량 분산분석
+
+다변량 분산분석은 여러 개의 평균 벡터의 차이를 여러 개의 그룹 간에 한꺼번에 비교하여 확인할 수 있는 가설 검정법이다.
+
+```{r}
+attach(AIDS)
+manova(cbind(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) ~ 
+         symptom + infected + homo + hemo + gender + offtrt + oprior + race + str2 + strat + z30 + drugs + karnof) |> summary()
+detach(AIDS)
+```
+
+거의 모든 범주형형 변수가 유의수준 0.1% 하에서조차 연속형 변수에 대해 차이를 보였다. 그러나 z30 변수와 drug 변수는 비교적 유의성이 낮아 유의수준 1% 하에서만 둘 다 기각된다. 이 원인은 변수를 해석해보면 밝혀질 수도 있다.
+
+z30은 "ZDV in the 30 days prior to 175"의 약자로, 이 문구는 특정 날짜를 기준으로 한 30일 동안의 ZDV 사용을 의미한다. 여기서 ZDV는 아마도 지돌부딘(Zidovudine)의 약어일 가능성이 크다. 지돌부딘은 HIV/AIDS 치료에 사용되는 항레트로바이러스 약물이다. AIDS 치료제를 사용하는 사람이 에이즈 환자 전체의 경향과는 달리 비감염자와 그나마 유사한 특성을 보인다는 것은 얼핏 이해가 안되지만, 이미 에이즈에 걸려서 고생을 하고 행동에 변화가 있었을 것이란 걸 고려하면 어느 정도는 납득할 수 있다. 또한 유의확률이 상대적으로 높을 뿐 여전히 일반적으로 적용되는 유의수준 5% 하에선 귀무가설을 기각하고 유의미한 차이가 있다고 볼 수 있다.
+
+drug는 "history of IV drug use"이며 IV 약물 사용(정맥주사 약물 사용)은 약물을 정맥을 통해 직접 주입하는 것을 의미한다. IV 약물 사용의 목적은 다양하며, 의료적 사용과 비의료적 사용(오남용)으로 구분될 수 있다.
+
+의료적 사용 의료적인 목적으로 IV 약물은 다음과 같은 상황에서 사용:
+
+-   신속한 약물 전달: 약물이 빠르게 혈류에 흡수되어 즉각적인 효과를 내야 할 때.
+-   고용량 약물 투여: 경구 투여로는 불가능한 고용량의 약물을 투여할 때.
+-   입원 치료: 병원에서 환자에게 지속적으로 약물을 공급해야 할 때.
+-   수분 및 전해질 보충: 탈수 상태이거나 전해질 불균형이 있을 때.
+-   영양 공급: 경구 섭취가 불가능한 환자에게 영양을 공급할 때(TPN, 전 비경구 영양).
+-   항생제 투여: 감염 치료를 위해 고용량의 항생제를 투여할 때.
+-   진통제 및 진정제 투여: 심한 통증이나 불안, 스트레스를 신속히 완화해야 할 때.
+-   항암제 투여: 암 치료를 위해 화학요법 약물을 투여할 때.
+
+비의료적 사용 - 비의료적인 목적으로는 주로 약물 오남용을 의미합니다. 이는 불법 약물 또는 처방 약물을 오용하는 것을 포함한다. 주요 사례는 다음과 같다:
+
+-   불법 약물: 헤로인, 메스암페타민, 코카인 등의 불법 약물을 주사.
+-   처방 약물 오용: 처방된 진통제, 진정제 등을 정맥주사로 남용.
+-   약물 의존: 주사 약물에 대한 의존성이 생긴 경우.
+-   감염 위험: 비위생적인 주사기 사용으로 인한 감염 위험(HIV, B형/C형 간염 등).
+
+에이즈 관련 변수이므로 비의료적 사용에 해당할 것이다. 유의수준 1%에서 평균 벡터의 동일성을 기각할 수 있으므로 적은 차이는 아니지만, 다른 변수들에 비해 상대적으로 덜 유의미하게 차이가 날 이유는 아마 약물 사용에 직접적으로 연관된 지표에 해당하는 변수가 없어서일 것이다.
+
+```{r}
+AIDS |> select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>
+  ggpairs(aes(color = AIDS$drugs, alpha = 0.2), title = "정맥 주사 약물 사용 여부에 따른 변수 구분", legend = 1,
+  upper = list(continuous = "box_no_facet", combo = "box_no_facet", discrete = "count", na = "na"),
+  lower = list(continuous = "points", combo = "facethist", discrete = "facetbar", na ="na"),
+) + theme(legend.position = "bottom")
+
+AIDS |> select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>
+  ggpairs(aes(color = AIDS$z30, alpha = 0.2), title = "지돌부딘 사용 여부에 따른 변수 구분", legend = 1,
+  upper = list(continuous = "box_no_facet", combo = "box_no_facet", discrete = "count", na = "na"),
+  lower = list(continuous = "points", combo = "facethist", discrete = "facetbar", na = "na") 
+)+ theme(legend.position = "bottom")
+
+AIDS |> ggpairs(title = "모든 변수")
+```
+
+# 연속형 데이터 분석
+
+앞선 가설검정에서는 범주형 변수로 분할된 연속형 변수들을 통해 그것들의 차이를 탐구하였다. 이번엔 실제 범주형 변수들을 제거하고 연속형 변수만으로 추론을 진행하여, 연속형 변수들만의 고유한 특성을 탐색해 보겠다.
+
+## 상관분석
+
+상관계수는 0이면 무관, 1이면 양의 상관관계, -1이면 음의 상관관계를 의미한다. 상관계수를 구하는 것은 어렵지 않고 따라서 실질적으로 해야 할 것은 상관계수 검정이다. 상관계수 검정을 통해 변수 간 상관관계가 유의미하게 큰지 확인하면 더 고급 분석을 할 수 있다.
+
+```{r}
+cat("Bartlett's test for sphericity\n")
+AIDS |> select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>
+  cortest.bartlett()
+
+AIDS |> select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>
+  ggcorr(label = TRUE, label_round = 3) + scale_fill_gradient(low = "blue", high = "red")
+```
+
+바틀렛의 구형성 검정에서 유의확률이 매우 낮으므로 구형성 귀무가설을 기각한다. 여기서 구형성이란 상관행렬이 단위행렬과 동일한 성질을 띄는 것을 의미한다. 그리고 상관행렬은 단위행렬과 다를 때 변수 간 상관관계를 나타내기 때문에, 구형성이 기각되었다는 것은 곧 상관관계를 의심할 수 있다는 것이다.
+
+실제 상관행렬을 보아도 숫자가 적지 않아 충분히 연속형 변수 간 상관관계를 의심할 수 있다.
+
+## 주성분 요인분석
+주성분 요인분석은 주성분분석 기반으로 요인을 찾아내는 기법으로, 적재량이 급격히 감소하지 않는 개수까지의 주성분 또는 일정 기준선 이상의 주성분을 요인으로 가정하고 분석한다. 
+ 이는 다변량 분산분석을 역으로 하는 것으로 이해할 수 있다. 다변량 분산분석은 연속형 변수들을 범주형 변수들로 쪼개서 공분산 행렬을 고려할 때 유의미한 평균 벡터의 차이가 있는지 검정한다. 반대로, 요인분석은 요인이라는 범주형 변수를 연속형 변수가 분산을 통해 쪼개는 구조이다. 그런데 분산은 연속형 변수에 대해 원래 구할 수가 있는 값이다. 따라서 일단 가지고 있는 연속형 데이터의 분산으로 가상의 요인을 구축한 다음 분산분석처럼 변수가 속하는 범주(요인)에 따라 왜 서로 다른 요인에 속하는지 해석하는 것은 충분히 가능하다. 즉, 요인분석을 하면 잠재된 범주형 변수를 구할 수가 있으며, 이를 잠재변수라고 한다. 
+
+ 이러한 이유로 주성분 요인분석을 수행하면 실제로 큰 영향을 미칠 법 한 범주형 변수의 한도는 몇 개 까지인지 생각해 볼 수 있다.
+```{r}
+for (i in 1:8){
+  AIDS %>% select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>
+    principal(nfactors = i, rotate = "varimax") -> temp
+  
+  print(temp)
+
+  fa.diagram(temp, simple = FALSE, cut = 0.7, digit = 3)
+}
+```
+
+모든 가능한 요인분석을 한 결과, 최적의 요인 수는 요인 적재량에 따라 7개로 확인되었다.
+
+그에 비해 범주형 변수들은 *symptom, infected, homo, hemo, gender, offtrt, oprior, race, str2, strat, z30, drugs, karnof*로 13개나 된다. 요인 적재량이 0.9 이상으로 매우 크며 요인 7개 하에서 괜찮게 분배되었으므로 요인의 분산 적재량 자체의 분산을 최대화하는 VARIMAX 알고리즘이 잘 작동한 것으로도 해석할 수 있다. 이는 곧 범주형 변수들 중에 여기서 구한 요인과 같은 작용을 하는, 원본 데이터의 정보가 손실되지 않으면서도 새로운 역할을 할 변수 집합을 찾아낼 수도 있다는 뜻이다. 결론적으로 원본 데이터를 그대로 사용하는 것을 넘어선 특성 설계가 유의미할 수 있음을 시사한다. 
+
+### 주성분 요인분석 시각화
+*factoextra* 패키지를 사용하면 쉽게 주성분 분석을 시각화할 수 있다.
+```{r}
+prcomp(num.vars, scale. = TRUE) -> pca.result
+
+scree(num.vars)
+
+pca.result |>
+  fviz_pca_var(axes = c(1, 2), choice = "var", col.var = "cos2", gradient.cols = c("#00AFCC", "#E7B828", "#FD4E97"), repel = TRUE)
+
+pca.result |>
+  fviz_contrib(axes = c(1, 2), choice = "var")
+
+pca.result |>
+  fviz_pca_biplot(col.ind = "grey", geom.ind = "point", choice = "var", 
+                col.var = "cos2", gradient.cols = c("red", "green", "blue"), repel = TRUE)
+
+```
+인구통계학적 변수(wtkg, age, preanti)들을 제외한 거의 모든 변수의 분산이 비슷한 방향을 가리키고 있었고, 데이터 포인트가 뚜렷하게 두 군집으로 나뉘어져 있다. 이러한 유형의 데이터에는 선형적인 분류 모형이나 군집 모형이 적절하다. 
+
+
+
+
+---------------------------------------------------------------------------
+
+
+# 판별분석
+
+## 로지스틱 판별분석
+
+일반화선형모형은 복잡한 데이터 중에서도 정규분포를 따르지 않는 데이터를 다루는 가장 기초적인 도구이다. 결과변수인 감염여부(*infected*)가 0과 1의 값을 가지는 이진변수이므로 그것들 중 로지스틱 회귀를 실시해 적합도를 확인해 볼 수 있다. 로지스틱 회귀는 판별분석에서도 자주 사용되기 때문에 괜찮은 결과를 기대해 볼 수 있다.
+
+```{r}
+glm(infected ~ ., family = binomial(link = "logit"), data = AIDS) -> logit.model 
+logit.model |> summary()
+logit.model |> predict(newdata = AIDS |> select(-infected), type = "response") -> logit.pred
+
+cat("Predicted infection rate: ")
+mean(logit.pred >= 0.5)
+
+cat("\nTrue infection rate: ")
+mean(AIDS$infected != 0)
+
+table(AIDS$infected, as.numeric(logit.pred >= 0.5)) -> logit.table 
+
+library(DescTools)
+Desc(logit.table, digits = 2)
+```
+로지스틱 회귀모형은 별다른 특성 설계와 전처리 없이도 전체 데이터에서 충분한 예측 정확도를 보였다. 이는 종속변수 *infected*와 독립변수들 사이에 선명한 선형관계가 있음을 증명한다. 그리고 변수들의 유의확률 간에 유의미한 차이가 보이므로, 보다 좋은 특성을 추출하여 계산을 효율화하고 예측 정확도를 올릴 수도 있을 것이다. 
+
+## 선형 판별 분석
+선형 판별 분석은 마할라노비스 거리 기반 판별과 정준판별함수 기반 판별을 배웠다. 로지스틱 회귀를 통해 충분히 선형 분류가 가능함을 확인하였으므로, 선형 판별 분석도 좋은 성능을 보일 것임을 예상할 수 있다. 여기서는 그중 정준판별함수 기반 판별 분석을 해볼 것이다. 
+```{r}
+AIDS |>
+  lda(infected ~ . , data = _) -> lda.result
+lda.result
+
+plot(lda.result, type = "both")
+
+lda.pred <- predict(lda.result, AIDS)
+
+cat("Predicted infection rate: ")
+mean(lda.pred$class != 0)
+
+cat("\nTrue infection rate: ")
+mean(AIDS$infected != 0)
+
+lda.table <- table(AIDS$infected, lda.pred$class)
+
+library(DescTools)
+Desc(lda.table, digits = 2)
+
+```
+R console에서 확인할 수 있는 혼동행렬 결과를 보면 비감염(0, 0) 예측 정확도가 70.5%, 감염(1, 1) 15.157%로 총합 85.7% 에 달했다. 이는 로지스틱 판별 분석보다 약간 낮은 정도이다. 하지만 감염율 예측에 한정하면 약간 더 나은 정확도를 보인다. 이제부터는 정확도를 높이는 데 집중하겠다.
+
+## 이차 판별 분석
+이차 판별 분석은 이차함수 곡선과 선형대수의 이차 형태를 응용하여 곡선의 판별함수를 생성하는 모형이다. 곡선을 사용하기 때문에 선형적인 판별 모형보다 더 성능이 좋을 수가 있다. 
+```{r}
+boxM(num.vars, AIDS$infected) -> AIDS.M
+AIDS.M
+```
+선형 판별 모형의 등분산성 가정이 기각되었으므로 이차 판별 분석을 하는 것은 타당하다.
+
+
+```{r}
+library(caret)
+nearZeroVar(AIDS, saveMetrics = TRUE) -> nzv
+AIDS[, !nzv$nzv] -> AIDS_filtered
+
+# Apply PCA to reduce dimensionality (optional step if needed)
+prcomp(num.vars, center = TRUE, scale. = TRUE) -> pca
+data.frame(pca$x) -> AIDS_pca 
+
+AIDS$infected -> AIDS_pca$infected
+
+
+# Perform QDA
+AIDS_pca |>
+  qda(infected ~ ., data = _) -> qda.result
+qda.result
+
+# Predict and create the confusion matrix
+predict(qda.result, AIDS_pca) -> qda.pred
+table(AIDS_pca$infected, qda.pred$class) -> qda.table
+
+# Display the results
+qda.table
+Desc(qda.table, digits = 2)
+```
+오히려 정확도가 더 떨어졌다. 감염율 예측은 더 감소하였다. 오류 메시지에 따르면 변수 간 다중공선성이 있다고 한다. 
+> AIDS |>
++   lda(infected ~ . , data = _) -> lda.result
+lda.default(x, grouping, ...)에서 경고가 발생했습니다 : 
+  변수들이 공선형관계에 있습니다
+  
+이러한 경우 단순한 선형대수로, 특히 역행렬로 구할 수 있는 통계적 추정치들은 부정확할 수 있다. 이것이 더 어렵고 복잡한 머신러닝이 필요한 이유이다.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

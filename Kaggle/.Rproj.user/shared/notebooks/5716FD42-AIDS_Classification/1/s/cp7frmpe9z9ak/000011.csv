@@ -1,0 +1,1 @@
+"0","fviz_pca_var(pca.result, axes = c(1, 2), choice = ""var"", col.var = ""cos2"", gradient.cols = c(""#00AFCC"", ""#E7B828"", ""#FD4E97""), repel = TRUE)"

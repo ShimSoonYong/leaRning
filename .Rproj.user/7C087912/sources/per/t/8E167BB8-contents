@@ -1,7 +1,10 @@
-```         
-title: "The R Book: Spatial Statistics"
-output: pdf_document                   
-```
+---
+title: 'The R Book: Spatial Statistics'
+output:
+  pdf_document:
+    latex_engine: xelatex
+theme: "black"
+---
 
 # Spatial Point processes
 
@@ -85,13 +88,167 @@ cdf.test(ponderosa, covariate = "y", test = "ks")
 
 Although we have use the KS test, other tests are available, so we may choose our favorite.
 
+The third approach to randomness is a little more complicated but, in many cases, more informative. Again, we pick a function, but this time it takes values at distances from zero up to the longest distance in the window. And again, we compare the empirical CDF of that function with CSR. The functions most commonly use are:
 
+-   **F**: The distance from anywhere in the window to the nearest point. In practice, a very fine grid is used rather than anywhere.
+-   **G**: The distance from any point to its nearest neighboring point.
+-   **K**: The number of points within a certain distance of any point. A more stable version of this is the **L** function.
 
+```{r}
+plot(envelope(ponderosa, Gest, nsim = 19, verbose = FALSE, global = TRUE), main = "")
+```
 
+-   The black line($\hat{G}_{obs}(r)$) is the [empirical CDF]{style="color:blue"}.
+-   The red line($G_{theo}(r)$) is the [theoretical]{style="color:blue"} equivalent to the black line, for instance, if there were 108 trees and the distances between them came as precisely as possible from a Poisson Process, then this red line would be the CDF.
+-   The grey-shaded region(or **envelope**) represents the outer limits of [random sample of size 19]{style="color:red"} drawn from the distribution described in the previous point. So if we run the envelope command again, we will get a slightly different envelope.
+-   We are interested in whether our data are random. This plot represents a hypothesis test with **null hypothesis that the data are random**. The sample size of 19 generates an envelope, based on that randomness assumption, [which is equivalent to checking whether *p*-value is less than 0.05]{style="color:red"}(the equivalent to a *p*-value of 0.01 would be a sample size of 99). If the black line moves outside the envelope, then there is evidence against the null hypothesis at the 5% level and at the distance *r* where the edge of the envelope is broken.
 
+None of the three types of tests we have described completely captures the extent to which our data are randomly distributed. They should be use as indicators in building a model rather than conclusive in themselves(as should all statistical tests!). There appears to be evidence of both a trend along *x*-axis, and some regularity for distances between 4 and 6m.
 
+------------------------------------------------------------------------
 
+## Models
 
+Our goal in building spatial point process models is usually to explain why the points are where they are. We can get some sense of the underlying **intensity** of points across a window just by looking at the points as in Figure 21.3. An alternative approach is to look at a heat map which gives a rough idea of the intensity of points across the whole window.
 
+**Figure 21.5** Ponderosa heat map.
 
+```{r}
+plot(density(ponderosa), main = "")
+```
 
+The values represents the number of trees per square meter, and the overall pattern backs up the indication that there are more trees further to the left that we go. The outcome that we will model is this intensity(denoted by $\lambda$). In fact, for technical reasons, we model the log intensity so that if we want to build a model with the *x* direction as a covariate, we would use either of the two following equivalent equations. $$ log(\lambda)=\beta_{0}+\beta_{1}x \\\lambda=e^{\beta_{0}+\beta_{1}x} $$ And then, generate the model as follows:
+
+```{r}
+ppm(ponderosa, ~x) -> ponderosa.model.1
+ponderosa.model.1
+```
+
+where the [ppm()]{style="color:red"} function performs a similar role to that which [lm()]{style="color:red"} does for linear models. The interpretation is akin to taht of GLM with a log-link function and the parameter estimators have been calculated using maximum likelihood approach. The fitted intensity function is $$\lambda(x)=e^{-4.4755-0.0075x}$$
+
+**Warning**: There is not just one heat map for any spatial point pattern. There are an infinite number which can be produced by varying the bandwidth(see [?density]{style="color:red"} for more details). This is analogous to varying the appearance of a histogram by changing the widths of the cells.
+
+The mean value of the intensity at the left-hand side of the window(when $x=0$) is $e^{-4.4755}=0.0114$ and every time we move one meter to the right that mean is multiplied by $e^{-0.0075}=0.9925$. The [Ztest]{style="color:red"} column suggests that the *x* covariate is significant, but we can compare it more specifically with the Poisson Process without a covariate.
+
+```{r}
+ppm(ponderosa) -> ponderosa.model.0
+anova(ponderosa.model.0, ponderosa.model.1, test = "Chisq")
+```
+
+The [test = "Chisq"]{style="color:red"} tells us that we are carrying out a **log likelihood ratio test**, and the covariate model is clearly an improvement (a *p*-value of 0.0074). AIC can also be used for comparisons between models. Other covariates such as soil type can be added into our models using the [data]{style="color:red"} argument in [ppm()]{style="color:red"}.
+
+Incidentally, if we felt that the data showed, for instance, a quadratic relationship, with *x*, then we could model that and then compare it with ponderosa.model.1 as follows:
+
+```{r}
+ppm(ponderosa, ~polynom(x, 2)) -> ponderosa.model.2
+anova(ponderosa.model.1, ponderosa.model.2, test = "Chisq")
+```
+
+but this does not appear to be an improvement.
+
+As usual, once we have created a model, we should check how well the model fits the data. The first approach to doing this is to run the randomness tests desribed above, but with ponderosa.model.1 rather tahn just the data:
+
+```{r}
+cdf.test(ponderosa.model.1, covariate = "x", test = "ks")
+```
+
+and the *p*-value is now clearly not significant, whereas with just the data it was far smaller(0.02).
+
+Alternatively, or additionally, we could examine residuals in an analogous fashion to linear models. Both the residuals and the resulting plots are more complex that those we have met before due to the multi-dimentional nature of our data. The four default plots are shown in Figure 21.6 for ponderosa.model.1:
+
+```{r}
+diagnose.ppm(ponderosa.model.1, main = "Figure 21.6")
+```
+
+In brief, the top-right and bottom-left plots show cumulative residuals with 5% significance lines. The residuals sneak outside the outer lines at above *x*=8m and *y*=115m, but if we run the plots for ponderosa.model.0, we will see that what we have now is a vast improvement.
+
+```{r}
+diagnose.ppm(ponderosa.model.0, main = "Figure 21.6")
+```
+
+We have dealt with the *x* trend, but not the regularity. We can incorporate clustering or regularity into our models by adding features(known as **Gibbs** or **interaction process**) that include either of these types of interaction between points.
+
+There is an ever-growing list of available Gibbs processes in spatstat(see [?ppm]{style="color:red"}), and they can be used to fit clustering or regularity at different distances between pairs or larger groups of points.
+
+In the Ponderosa data set, there appears to be regularity up to about 6m. The Strauss model is a fairly straightforward model for dealing with interactions between pairs of points. To use it, we need to specify the distance(*r*) up to which we believe the interactions are taking place. We will start at *r*=6, but we could play around with this value to see what results in the most satisfactory set of residuals. More complicated models may require more than one such distance(described in [spatstat]{style="color:skyblue"} as **irregular** parameters), and there are not completely satisfactory automated techniques for estimating them. The Strauss model is:
+
+```{r}
+ppm(ponderosa, ~x, interaction = Strauss(r = 6)) -> ponderosa.model.3
+ponderosa.model.3
+```
+
+What on earth do these mean? The actual value is not critical, but $\gamma<1$ implies that we have fitted a model with regularity up to 6m. $\gamma>1$ would suggest clustering, and $\gamma \approx 1$ neither(it means the residuals appear to come from a Poisson Process). Model fitting is carried out using a **pseudolikelihood**(an approximation to the likelihood). To see how good the fit is, we can examine the residuals for distance functions. We would expect these to cluster around zero at all distances but with greater uncertainty for larger distances. A plot of these for the G function is displayed in Figure 21.7a.
+
+```{r}
+plot(Gres(ponderosa.model.3), main = "Figure 21.7a", legend = FALSE)
+```
+
+The black and red lines represents the residuals from the model after adjusting for the edge effect in two different ways. The outer bands are simulated from the model and represent a sort of envelope. They suggests where we might look for further model refinement.
+
+In this case, the residuals fall well within the outer bands and it appears that no further refinement of the model is necessary. However, it is always worth examining residuals for more than one function.
+
+```{r}
+plot(Kres(ponderosa.model.3), xlim = c(0, 14), main = "Figure 21.7b", legend = FALSE)
+```
+
+The plot for K residuals is shown in Figure 21.7b. We have kept the same *x* range as the G plot. It appears to confirm our diagnosis. Data may exhibit different clustering or regularity at different distances and multiple interaction processes can be introduced into **hybrid** models using [interactions = Hybrid(S = Strauss(r = 5), ...)]{style="color:red"}(Baddeley et al., 2013). Gibbs processes are good at representing regularity but are not always ideal for clustering. For the latter, an alternative approach is to use Cox or cluster processes. However, these can not currently be combined with other processes into hybrid models.
+---------------------------------------------------------------------
+## Marks
+
+In many spatial point processes there may be data, known as **marks**, attached to each point. For instance, in the ragwort dataset, four different types of ragwort are recorded, and they are shown in Figure 21.8.
+
+```{r}
+ragwort.data <- read.table("Datasets/ragwortmap2.txt", header = TRUE,
+                           colClasses = c(type = "factor"))
+ragwort <- ppp(x = ragwort.data$x, y = ragwort.data$y,
+               xrange = c(0, 3000), yrange = c(0, 1500),
+               marks = ragwort.data$type)
+summary(ragwort)
+plot(ragwort, main = "Figure 21.8", cols = hue_pal()(4), pch = 15:18)
+```
+
+The mark is the species of ragwort, given in column *type* which must be a factor, and the window is specified using the ranges of *x* and *y* coordinates. In this case, the types are categorical. There are four different species as summarized above. Marks can also be continuous. For instance, in the ragwort data set, we can see that some entries have a diameter. As there are fewer options for building models with continuous marks, it is often simplest to divide them into a small number of multi-type categories using the [cut()]{style="color:red"} function.
+
+It is important with marked data to be sure that a spatial point process is still appropriate, that the locations of the points results from some random pattern that we are interested in investigating.
+
+So if we wanted to study the overall prevalence of the fours species of ragowrt but were not bothered about location then a spatial point process model would not be suitable. We could treat the location as a covariate. However, if we were studying the effect of species on the locations of other species, then it would. It is important to clear up front about the research question that is being investigated.
+
+Many of the techniques described for unmarked point patterns can be applied to marked patters but, inevitably, the marks introduce another layer of complexity. We will just touch on some of the possibilities in the remainder of this section.
+
+For instance, heat plots for each of the species can be easily produced.
+
+```{r}
+plot(density(split(ragwort)), main = "Simple Density")
+```
+
+However, they don't give any sense of the relative frequency of each of the four species. This can be shown in Figure 21.9 using the [relrisk()]{style="color:red"} function.
+
+```{r}
+plot(relrisk(ragwort), zlim = c(0, 1), main = "Figure 21.9")
+```
+
+The [zlim]{style="color:red"} argument standardizes the plots so that a shade in any of the plots represents the same frequency of plant relative to the total. As we had already seen, there are very few regrowth and rosette plants compared with seedlings and skeletons.
+
+One way of exploring how the different species interact is to plot the distance functions, like G, for pairs of species. We can create Figure 21.10 as follows:
+
+```{R}
+plot(alltypes(ragwort, "G"), title = "Figure 21.10")
+```
+
+Each plot shows the extent to which one species is clustered or regular compared to another species and can be interpreted in a similar way to the lines in Figure 21.4.
+
+For instance, as one might expect, the diagonal plots show that all species tend to cluster together: the red, green, and black lines, representing different sorts of edge correction, are well above the blue randomness line.
+
+The plot in second row, third column is interesting as it suggests that at short distances seedlings cluster around rosettes but that thereafter they tend to keep their distance.
+
+Envelopes can be added in the [alltypes()]{style="color:red"} function for randomness tests. We might expect the matrix of plots to be symmetrical, but if, for instance, seedlings cluster around rosettes there is no expectation that rosettes will cluster around seedlings: there may be a variety of patterns that might account for the initial clustering.
+
+Point process models can be built which take the marks into account.
+
+```{r}
+ppm(ragwort, ~ marks)
+```
+
+In this case, the first mark alphabetically, regrowth, is built into the intercept, and then differences of intensity compared with other marks are displayed as covariates. Unsurprisingly, seedlings and skeletons show a significantly different intensity from regrowth, whereas rosettes do not. Covariates such as soil type or distance in the *x* direction can be added in the usual way.
+
+Finally, we can add in Gibbs process to our model to take account of regularity. For instance, the multi-type Strauss process allows us to specify, for each pair of species, different distances up to which regularity interactions are taking place(see [?MultiStrauss]{style="color:red"} for more details). At present, [spatstat]{style="color: skyblue"} in common with other packages does not have processes that deal with multi-type clustering in an analogous way.

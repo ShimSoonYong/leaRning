@@ -1,0 +1,15 @@
+R YAML header template
+
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["fontspec", "xltxtra", "xunicode"]
+    pandoc_args: [
+      "--pdf-engine=xelatex",
+      "--pdf-engine-opt=-shell-escape"
+    ]
+fontsize: 12pt
+geometry: margin=1in
+mainfont: NanumGothic
+monofont: NanumGothic
+---

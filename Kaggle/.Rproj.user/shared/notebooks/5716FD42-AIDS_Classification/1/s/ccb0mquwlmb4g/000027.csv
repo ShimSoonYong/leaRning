@@ -1,0 +1,36 @@
+"0","cat(""Bartlett's test for sphericity\n"")"
+"1","Bartlett's test for sphericity
+"
+"0","AIDS |> select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>"
+"0","  cortest.bartlett()"
+"2","R was not square, finding R from data
+"
+"1","$chisq
+"
+"1","[1]"
+"1"," 3764.862"
+"1","
+"
+"1","
+"
+"1","$p.value
+"
+"1","[1]"
+"1"," 0"
+"1","
+"
+"1","
+"
+"1","$df
+"
+"1","[1]"
+"1"," 28"
+"1","
+"
+"1","
+"
+"0","AIDS |> select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) |>"
+"0","  ggcorr(label = TRUE, label_round = 3) + scale_fill_gradient(low = ""blue"", high = ""red"")"
+"1","[38;5;46mScale for [32mfill[38;5;46m is already present.
+Adding another scale for [32mfill[38;5;46m, which will replace the existing scale.[39m
+"

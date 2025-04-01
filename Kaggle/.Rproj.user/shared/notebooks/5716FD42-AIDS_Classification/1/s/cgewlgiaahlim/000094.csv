@@ -1,0 +1,15 @@
+"0","for (i in 1:8){"
+"0","  AIDS %>% select(wtkg, preanti, age, cd40, cd420, cd80, cd820, time) %>%"
+"0","    principal(nfactors = i, rotate = ""varimax"") -> temp"
+"0","  "
+"0","  print(temp)"
+"0",""
+"0","  fa.diagram(temp, simple = FALSE, cut = 0.7, digit = 3)"
+"0","}"
+"1","Principal Components Analysis"
+"1","
+Call: "
+"1","principal(r = ., nfactors = i, rotate = ""varimax"")
+"
+"1","Standardized loadings (pattern matrix) based upon correlation matrix
+"

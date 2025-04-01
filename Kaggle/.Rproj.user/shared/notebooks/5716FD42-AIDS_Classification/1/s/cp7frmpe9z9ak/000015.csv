@@ -1,0 +1,2 @@
+"0","fviz_pca_biplot(pca.result, col.ind = ""grey"", geom.ind = ""point"", choice = ""var"", "
+"0","                col.var = ""cos2"", gradient.cols = c(""red"", ""green"", ""blue""), repel = TRUE)"
